@@ -1,0 +1,233 @@
+{
+  "name": "Zoho CRM × Lusha Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f6f52c53-fc09-45f1-9204-74738a7d2e75",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.zohoCrm",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d53ebaaa-82cb-4641-bc0d-a25d08703746",
+      "name": "Get many leads",
+      "credentials": {
+        "zohoOAuth2Api": {
+          "id": "BfY6l9fx5nAQL5cJ",
+          "name": "Zoho OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lushaData = {\n  \"john.smith@abctech.com\": { phone: \"+91 99999 99999\", title: \"Sales Manager\", linkedin: \"linkedin.com/in/johnsmith\" },\n  \"priya.mehta@xyzcorp.com\": { phone: \"+91 88888 88888\", title: \"Marketing Head\", linkedin: \"linkedin.com/in/priyamehta\" },\n  \"raj.patel@innovate.in\": { phone: \"+91 77777 77777\", title: \"CEO\", linkedin: \"linkedin.com/in/rajpatel\" },\n  \"sara.c@nextgensol.com\": { phone: \"+91 66666 66666\", title: \"VP Sales\", linkedin: \"linkedin.com/in/saraconnor\" },\n  \"amit.v@databridge.io\": { phone: \"+91 91111 11111\", title: \"CTO\", linkedin: \"linkedin.com/in/amitverma\" },\n  \"lisa.wang@cloudbase.co\": { phone: \"+91 92222 22222\", title: \"Product Manager\", linkedin: \"linkedin.com/in/lisawang\" },\n  \"karan.j@salespro.in\": { phone: \"+91 93333 33333\", title: \"Business Dev Manager\", linkedin: \"linkedin.com/in/karanjoshi\" },\n  \"emma.d@growfast.com\": { phone: \"+91 94444 44444\", title: \"Director of Operations\", linkedin: \"linkedin.com/in/emmadavis\" },\n  \"rohit.s@techpilot.io\": { phone: \"+91 95555 55555\", title: \"Founder\", linkedin: \"linkedin.com/in/rohitsinha\" },\n  \"maya.i@optima.in\": { phone: \"+91 96666 66666\", title: \"HR Manager\", linkedin: \"linkedin.com/in/mayaiyer\" },\n  \"j.kim@futurecrm.com\": { phone: \"+91 97777 77777\", title: \"Account Executive\", linkedin: \"linkedin.com/in/jameskim\" },\n  \"nisha.g@bizscale.in\": { phone: \"+91 98888 88888\", title: \"Sales Lead\", linkedin: \"linkedin.com/in/nishagupta\" },\n  \"t.brady@horizontech.com\": { phone: \"+91 90000 00001\", title: \"VP Engineering\", linkedin: \"linkedin.com/in/tombrady\" },\n  \"deepa.n@nexuscorp.in\": { phone: \"+91 90000 00002\", title: \"Operations Head\", linkedin: \"linkedin.com/in/deepanair\" },\n  \"arjun.r@sprintsales.io\": { phone: \"+91 90000 00003\", title: \"Sales Director\", linkedin: \"linkedin.com/in/arjunreddy\" }\n};\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const email = item.json.Email?.toLowerCase();\n  const enriched = lushaData[email];\n  \n  results.push({\n    json: {\n      id: item.json.id,\n      Full_Name: item.json.Full_Name,\n      Email: email,\n      Company: item.json.Company,\n      Lead_Status: item.json.Lead_Status,\n      Phone: enriched ? enriched.phone : item.json.Phone,\n      Title: enriched ? enriched.title : \"Unknown\",\n      LinkedIn: enriched ? enriched.linkedin : \"Not found\",\n      Enriched: enriched ? true : false\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "d2863519-414f-40df-8c37-cfc28e11a36d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "update",
+        "leadId": "={{ $json.id }}",
+        "updateFields": {
+          "Description": "={{ $json.LinkedIn }}",
+          "Designation": "={{ $json.Title }}",
+          "Phone": "={{ $json.Phone }}"
+        }
+      },
+      "type": "n8n-nodes-base.zohoCrm",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "daf20da1-b894-4e1b-96dc-5ee9a19c25db",
+      "name": "Update a lead",
+      "credentials": {
+        "zohoOAuth2Api": {
+          "id": "BfY6l9fx5nAQL5cJ",
+          "name": "Zoho OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyse this sales lead and give a priority score 1-10 and one recommended action. Lead: {{ $json.Full_Name }}, Company: {{ $json.Company }}, Title: {{ $json.Title }}, Status: {{ $json.Lead_Status }}. Reply in 2 lines max.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        0
+      ],
+      "id": "79e50498-00ba-4dc4-9942-e99d23b79748",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "zwJsL1s365FwCX3P",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "roopanhsee@gmail.com",
+        "subject": "=CRM Lead Enrichment Report - {{ $now.format('dd MMM yyyy') }}",
+        "message": "=Hi,\n\nAutomated Lead Enrichment Report — {{ $now.format('dd MMM yyyy') }}\n\nTotal leads processed: {{ $input.all().length }}\n\n{% for item in $input.all() %}\n---\nName: {{ item.json.Full_Name }}\nCompany: {{ item.json.Company }}\nTitle: {{ item.json.Title }}\nPhone: {{ item.json.Phone }}\nStatus: {{ item.json.Lead_Status }}\nAI Analysis: {{ item.json.choices[0].message.content }}\n{% endfor %}\n\n---\nAutomatically generated by n8n × Zoho CRM × Lusha × Groq AI",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        0
+      ],
+      "id": "d176add5-0e03-47c0-81d2-9d1963edd7ea",
+      "name": "Send a message",
+      "webhookId": "68332c38-f346-49b2-b760-2533be6794a3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "hSyvTNOfsXz3nvF0",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        0
+      ],
+      "id": "6e07914f-648d-4227-aed9-6965447adf4b",
+      "name": "Aggregate"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many leads": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update a lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a lead": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "466b0cc1-430f-46cb-b739-579499c89fb7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0983b686008fb5a27daeda4b8ff01336e807107f292f0b11ebca197ef5149950"
+  },
+  "id": "dUKUxhrLoujmKvth",
+  "tags": []
+}
